@@ -35,11 +35,11 @@ alpha = 0 #intercept when simulated y values (effect of time)
 ipw.est = function(df,A1.val, A2.val){
   #Randomization probabilities are .5 
   
-  numerator <- (df$A1 == A1.val & ((df$NR == 1 & df$A2 == A2.val) | df$NR == 0)) * df$y1
-  denominator <- df$A1.prob * (df$A2.prob * as.integer(df$NR==1) + as.integer(df$NR==0))
+  numerator = (df$A1 == A1.val & ((df$NR == 1 & df$A2 == A2.val) | df$NR == 0)) * df$y1
+  denominator = df$A1.prob * (df$A2.prob * as.integer(df$NR==1) + as.integer(df$NR==0))
   
   #Calculate the mean
-  mu_a1_a2 <- mean((numerator / denominator))
+  mu_a1_a2 = mean((numerator / denominator))
   return(mu_a1_a2)
 }
 
@@ -132,7 +132,7 @@ sim.SMART.allDTR = function(N.all, nr.prob, control.mean, control.sd, delta_E,de
   muhat.m1m1 =  ipw.est(df=api.dat,A1.val=-1,A2.val = -1)
   muhat.11 =ipw.est(df=api.dat,A1.val=1,A2.val = 1)
   muhat.1m1 = ipw.est(df=api.dat,A1.val=1,A2.val = -1)
-  mu0 <- control.mean
+  mu0 = control.mean
   
   # Create the list with all variables
   int.analysis1 = data.frame(
@@ -157,8 +157,8 @@ sim.SMART.allDTR = function(N.all, nr.prob, control.mean, control.sd, delta_E,de
     S = c("11", "1-1", "-11", "-1-1")[which.max(c(muhat.11 - muhat.0, muhat.1m1 - muhat.0, muhat.m11 - muhat.0, muhat.m1m1 - muhat.0))]
   )
   # Add a1 and a2 columns based on S
-  int.analysis1$Sa1 <- ifelse(int.analysis1$S %in% c("11", "1-1"), 1, -1)
-  int.analysis1$Sa2 <- ifelse(int.analysis1$S %in% c("11", "-11"), 1, -1)
+  int.analysis1$Sa1 = ifelse(int.analysis1$S %in% c("11", "1-1"), 1, -1)
+  int.analysis1$Sa2 = ifelse(int.analysis1$S %in% c("11", "-11"), 1, -1)
   
   #-------------------------------------------------------------------------------
   # Interim analysis 2 with best treatment (not looking at efficacy or futility here, just collecting the results to get WS2, WS3)
@@ -233,7 +233,7 @@ sim.SMART.allDTR = function(N.all, nr.prob, control.mean, control.sd, delta_E,de
  
   muhat2.0 = mean(control.dat2$y1)
   muhat.s = ipw.est(df=api.dat2,A1.val=int.analysis1$Sa1,A2.val = int.analysis1$Sa2)
-  mu0 <- control.mean
+  mu0 = control.mean
   
   # Create the df with all results
   int.analysis2 = data.frame(
@@ -319,7 +319,7 @@ sim.SMART.allDTR = function(N.all, nr.prob, control.mean, control.sd, delta_E,de
   
   api.dat3 = rbind(api.dat2,api3) #all the data
   muhat.s = ipw.est(df=api.dat3,A1.val=int.analysis1$Sa1,A2.val = int.analysis1$Sa2)
-  mu0 <- control.mean
+  mu0 = control.mean
   
   # Create the df with all results
   int.analysis3 = data.frame(
@@ -365,13 +365,13 @@ save(int1.res,int2.res,int3.res,file="3interim.anal.res.rda")
 set.seed(123)
 
 # Number of simulations - Monte Carlo to approximate the true value
-n_sims <- 1000000
+n_sims = 1000000
 
 # Simulate four standard normal variables and find their maximum
-theta_hat_max <- replicate(n_sims, max(rnorm(4, mean = 0, sd = 1)))
+theta_hat_max = replicate(n_sims, max(rnorm(4, mean = 0, sd = 1)))
 
 # Mean of the 1 million maximum values should approximate truth
-true_theta_max <- mean(theta_hat_max)
+true_theta_max = mean(theta_hat_max)
 
 # theta_S or theta_max
 true_theta_max
