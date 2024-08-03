@@ -158,7 +158,7 @@ integrate_tight.tol_WS1 <- function() {
   }, lower = lb, upper = ub, rel.tol = 1e-10,subdivisions = 10000)$value
 }
 
-#integrate_tight.tol_WS1() #.35 if lb=10, ub=60, wrong probability
+#integrate_tight.tol_WS1() #.35 if lb=10, ub=60, makes more sense but does not match simulation
 
 # Compute the probability
 probability <- integrate_tight.tol_WS1(); probability 
