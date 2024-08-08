@@ -108,7 +108,7 @@ f_WS1 = function(ws1) {
 # Define the conditional density functions to do the recursive integration 
 #-------------------------------------------------------------------------------
 f_WS2_given_WS1 = function(ws2, ws1) {
-  dnorm(ws2, mean = ws1, sd = sqrt(I2 - I1))
+  dnorm(ws2, mean = ws1, sd = sqrt(I2 - I1)) #theta_S is 0 so I took that term out
 }
 
 f_WS3_given_WS2 = function(ws3, ws2) {
@@ -144,12 +144,6 @@ integrate_WS2 = function(ws1_values) {
 #--------------------------------------------------------------
 # Integrate f(W_S1) * integrate_WS2(ws1) over W_S1
 #--------------------------------------------------------------
-integrate_WS1 = function() {
-  integrate(function(ws1_values) {
-    f_WS1(ws1_values) * integrate_WS2(ws1_values)
-  }, lower = lb, upper = ub,subdivisions = 10000)$value
-}
-#integrate_WS1() #3.09...if lb=10, ub=60. Getting a value greater than 1..
 
 #Tighter tolerance if numerical precision is the issue
 integrate_tight.tol_WS1 = function() {
@@ -158,13 +152,13 @@ integrate_tight.tol_WS1 = function() {
   }, lower = lb, upper = ub, rel.tol = 1e-10,subdivisions = 10000)$value
 }
 
-#integrate_tight.tol_WS1() #.35 if lb=10, ub=60, makes more sense but does not match simulation
+integrate_tight.tol_WS1() #.35 if lb=10, ub=1000, does not match simulation
 
 # Compute the probability
 probability = integrate_tight.tol_WS1(); probability 
 
 #Verify with empirical probability with simulated ws1, ws2 and ws3 values
-mean(sim.ws1 > 10 & sim.ws2 > 10 & sim.ws3 > 10) 
+mean(sim.ws1 > 10 & sim.ws2 > 10 & sim.ws3 > 10) #.035
 
 #-------------------------------------------------------------------------------
 # Define the marginal probability function for W_S3 > c
@@ -228,13 +222,13 @@ lines(ws1_values, ws1_density, col = "blue", lwd = 2)
 WS2_joint_density = function(ws2, ws1) {
   integrate(function(ws3) {
     f_WS3_given_WS2(ws3, ws2)
-  }, lower = -Inf, upper = Inf, subdivisions = 10000)$value * f_WS2_given_WS1(ws2, ws1)
+  }, lower = -Inf, upper = Inf)$value * f_WS2_given_WS1(ws2, ws1)
 }
 
 marginal_density_WS2 = function(ws2) {
   integrate(function(ws1) {
     WS2_joint_density(ws2, ws1) * f_WS1(ws1)
-  }, lower = -Inf, upper = Inf, subdivisions = 10000)$value
+  }, lower = -Inf, upper = Inf)$value
 }
 
 hist(sim.ws2, breaks = 30, probability = TRUE, main = "Marginal Density of WS2", xlab = "WS2", xlim = c(min(sim.ws2), max(sim.ws2)), col = "lightgray")
