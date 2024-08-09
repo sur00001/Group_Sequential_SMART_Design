@@ -13,7 +13,7 @@ suppressMessages(library(geepack))
 # Set simulation parameters (for debugging)
 #-------------------------------------------------------------------------------
 # set.seed(1996)
-nsim = 1000 #Number of simulations 
+nsim = 5000 #Number of simulations 
 N.all=3000 #N is total people in the recruitment group
 # int.tprop = c(.8,.1,.1) #proportion of information for each interim analysis (later need to see how this affects the alpha boundaries)
 nr.prob = .3 #non-response rate in overal API group (can be different for A1 groups if A1 group outcomes are different)

@@ -129,6 +129,10 @@ f_WS3_given_WS2 = function(ws3, ws2) {
 #Useful when integrating over a range of values, allows the inner function to handle multiple inputs simultaneously 
 #so don't need extra function() wrappers. Also slightly faster
 
+
+#Joint probability of all Ws < -10
+
+#Joint probability above 10
 start = proc.time()
 
 joint_prob_WS1_WS2_g10 =integrate(Vectorize(function(ws1) {
@@ -146,6 +150,18 @@ mean(sim.ws1>10 & sim.ws2>10) #.143, close enough
 #-------------------------------------------------------------------------------
 start = proc.time()
 
+#Less than -10
+joint_prob_WS1_WS2_WS3_lm10 = integrate(Vectorize(function(ws1) {
+  f_WS1(ws1) * integrate(Vectorize(function(ws2) {
+    f_WS2_given_WS1(ws2, ws1) * integrate(f_WS3_given_WS2, lower = -Inf, upper = -10, ws2 = ws2, rel.tol = 1e-10)$value
+  }), lower = -Inf, upper = -10, rel.tol = 1e-10)$value
+}), lower = -Inf, upper = -10, rel.tol = 1e-10)$value
+
+# Print the joint probability
+print(joint_prob_WS1_WS2_WS3_lm10) #0.006028711
+mean(sim.ws1< -10 & sim.ws2 < -10 &sim.ws3< -10) #.006
+
+#Greater than 10
 joint_prob_WS1_WS2_WS3_g10 = integrate(Vectorize(function(ws1) {
   f_WS1(ws1) * integrate(Vectorize(function(ws2) {
     f_WS2_given_WS1(ws2, ws1) * integrate(f_WS3_given_WS2, lower = 10, upper = Inf, ws2 = ws2, rel.tol = 1e-10)$value
@@ -154,10 +170,12 @@ joint_prob_WS1_WS2_WS3_g10 = integrate(Vectorize(function(ws1) {
 
 # Print the joint probability
 print(joint_prob_WS1_WS2_WS3_g10) #.106
-
 print(proc.time() - start) 
 
 mean(sim.ws1>10 & sim.ws2>10 &sim.ws3>10) #.121
+
+
+
 
 #-------------------------------------------------------------------------------
 #Check if WS1, WS2 and WS3 marginal densities match the simulated distributions
