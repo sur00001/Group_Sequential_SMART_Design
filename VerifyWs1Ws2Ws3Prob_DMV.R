@@ -117,118 +117,77 @@ f_WS3_given_WS2 = function(ws3, ws2) {
 }
 
 #-------------------------------------------------------------------------------
-#Recursive integration functions
+#Recursive integration to find joint probability of WS1 > 10 and WS2 > 10
 #-------------------------------------------------------------------------------
 
-#--------------------------------------------------------------
-# Integrate f(W_S3 | W_S2) over W_S3
-#--------------------------------------------------------------
-integrate_WS3 = function(ws2_values) {
-  integrate(function(ws3_values) {
-    f_WS3_given_WS2(ws3_values, ws2_values)
-  }, lower = lb, upper = ub,rel.tol = 1e-10,subdivisions = 100)$value
-}
+#First integrate over Ws2 given a fixed value of Ws1 and then integrate over Ws1
 
-#integrate_WS3(10) #check that function runs
-
-#--------------------------------------------------------------
-# Integrate f(W_S2 | W_S1) * integrate_WS3(ws2) over W_S2
-#--------------------------------------------------------------
-integrate_WS2 = function(ws1_values) {
-  integrate(function(ws2_values) {
-    f_WS2_given_WS1(ws2_values, ws1_values) * integrate_WS3(ws2_values)
-  }, lower = lb, upper = ub,rel.tol = 1e-10,subdivisions = 100)$value
-}
-
-#integrate_WS2(10) #check
-
-#--------------------------------------------------------------
-# Integrate f(W_S1) * integrate_WS2(ws1) over W_S1
-#--------------------------------------------------------------
-
-#Tighter tolerance if numerical precision is the issue
-integrate_tight.tol_WS1 = function() {
-  integrate(function(ws1_values) {
-    f_WS1(ws1_values) * integrate_WS2(ws1_values)
-  }, lower = lb, upper = ub, rel.tol = 1e-10,subdivisions = 100)$value
-}
-
+# Calculate the joint probability using Vectorize
+# Vectorize applies the function to each element of the vector individually. 
+#The outer integrate() integrates the vectorized function over ws1 from 10 to 10,000, 
+#summing up the contributions from all relevant ws1 values to compute the overall joint probability.
+#Useful when integrating over a range of values, allows the inner function to handle multiple inputs simultaneously 
+#so don't need extra function() wrappers. Also slightly faster
 
 start = proc.time()
-# Compute the probability
-probability = integrate_tight.tol_WS1(); probability #Getting .60
-print(proc.time() - start)
 
-#Verify with empirical probability with simulated ws1, ws2 and ws3 values
-mean(sim.ws1 > 10 & sim.ws2 > 10 & sim.ws3 > 10) #.121
+joint_prob_WS1_WS2_g10 =integrate(Vectorize(function(ws1) {
+  f_WS1(ws1) * integrate(f_WS2_given_WS1, lower = 10, upper = Inf, ws1 = ws1,rel.tol = 1e-10)$value
+}), lower = 10, upper = Inf,rel.tol = 1e-10)$value
 
+print(joint_prob_WS1_WS2_g10)
+print(proc.time() - start) #.135
+
+#See if it matches the simulation 
+mean(sim.ws1>10 & sim.ws2>10) #.143, close enough
 
 #-------------------------------------------------------------------------------
-# Define the marginal probability function for W_S3 > c
+#Recursive integration to find joint probability of WS1 > 10, WS2 > 10, WS3 >10
 #-------------------------------------------------------------------------------
-P_WS3_greater_than_c = function(c) { #need to integrate out ws2 and ws1
-  integrate(function(ws2) {
-    integrate(function(ws1) {
-      f_WS1(ws1) * f_WS2_given_WS1(ws2, ws1)
-    }, lower = -Inf, upper = Inf)$value * (1 - pnorm(c, mean = ws2 + theta_S * (I3 - I2), sd = sqrt(I3 - I2)))
-  }, lower = -Inf, upper = Inf)$value
-}
+start = proc.time()
 
-#P_WS3_greater_than_c(10) #this takes FOREVER...
+joint_prob_WS1_WS2_WS3_g10 = integrate(Vectorize(function(ws1) {
+  f_WS1(ws1) * integrate(Vectorize(function(ws2) {
+    f_WS2_given_WS1(ws2, ws1) * integrate(f_WS3_given_WS2, lower = 10, upper = Inf, ws2 = ws2, rel.tol = 1e-10)$value
+  }), lower = 10, upper = Inf, rel.tol = 1e-10)$value
+}), lower = 10, upper = Inf, rel.tol = 1e-10)$value
 
-#---------------------------------------------------------------------------
-# Debugging 
-#---------------------------------------------------------------------------
+# Print the joint probability
+print(joint_prob_WS1_WS2_WS3_g10) #.106
 
-# Check if f_WS1 integrates to 1
-test_f_WS1 = integrate(f_WS1, lower = -Inf, upper = Inf)$value
-test_f_WS1 #Yes, the probability is 1
+print(proc.time() - start) 
 
-# Check if f_WS2_given_WS1 integrates to 1 for a given ws1 
-test_f_WS2_given_WS1 = function(ws1) {
-  integrate(function(ws2) {
-    f_WS2_given_WS1(ws2, ws1)
-  }, lower = -Inf, upper = Inf)$value
-}
-test_f_WS2_given_WS1(10)
-
-# Check if f_WS3_given_WS2 integrates to 1 for a given ws2
-test_f_WS3_given_WS2 = function(ws2) {
-  integrate(function(ws3) {
-    f_WS3_given_WS2(ws3, ws2)
-  }, lower = -Inf, upper = Inf)$value
-}
-test_f_WS3_given_WS2(30)
-
+mean(sim.ws1>10 & sim.ws2>10 &sim.ws3>10) #.121
 
 #-------------------------------------------------------------------------------
 #Check if WS1, WS2 and WS3 marginal densities match the simulated distributions
 #-------------------------------------------------------------------------------
-#WS2 AND WS3 TAKE WAY TOO LONG 
+ #Only checked WS2 and WS1. WS3 is more complicated
 
 #--------------------------
 #WS1
 #--------------------------
-
-hist(sim.ws1, breaks = 30, probability = TRUE, main = "Marginal Density of ws1", xlab = "ws1", xlim = c(min(sim.ws1), max(sim.ws1)), col = "lightgray")
 
 # Sequence of values for ws1 
 ws1_values = seq(min(sim.ws1), max(sim.ws1), length.out = 200)
 
 # Marginal density of ws1 for this range
 ws1_density = sapply(ws1_values, f_WS1)
+
+#Plot density over histogram
+hist(sim.ws1, breaks = 30, probability = TRUE, main = "Marginal Density of ws1", xlab = "ws1", xlim = c(min(sim.ws1), max(sim.ws1)), col = "lightgray")
 lines(ws1_values, ws1_density, col = "blue", lwd = 2)
 
 #------------------------------
 # Marginal density of WS2
 #------------------------------
+
+#David's code
 marginal_density_WS2 = function(ws2) {
 	integrate(function(ws1) {
 		f_WS2_given_WS1(ws2, ws1) * f_WS1(ws1)
 	}, lower = -Inf, upper = Inf, rel.tol = 10^-3)$value
 }
-
-
 
 hist(sim.ws2, breaks = 30, probability = TRUE, main = "Marginal Density of WS2", xlab = "WS2", xlim = c(min(sim.ws2), max(sim.ws2)), col = "lightgray")
 
@@ -236,10 +195,10 @@ ws2_values = seq(min(sim.ws2), max(sim.ws2), length.out = 100)
 ws2_values = seq(-20, 30, length.out = 10)
 
 # Compute the marginal density of WS2 for this range
-ws2_density <- NULL
-start <- proc.time()
+ws2_density = NULL
+start = proc.time()
 for(i in 1:length(ws2_values)) {
-	start <- proc.time()
+	start = proc.time()
 	ws2_density = c(ws2_density, marginal_density_WS2(ws2_values[i]))
 	print(i)
 	print(proc.time() - start)
@@ -249,12 +208,12 @@ for(i in 1:length(ws2_values)) {
 lines(ws2_values, ws2_density, col = "blue", lwd = 2)
 
 
-
-
-## not the correct form for joint density of WS2 and WS1 but you end up in the right place
+## David: not the correct form for joint density of WS2 and WS1 but you end up in the right place
 ## for the marginal distribution of W2
 ## can be quicker (only 1 integral) in the above code
 
+
+#My code
 WS2_joint_density = function(ws2, ws1) {
   integrate(function(ws3) {
     f_WS3_given_WS2(ws3, ws2)
@@ -267,19 +226,76 @@ marginal_density_WS2 = function(ws2) {
   }, lower = -Inf, upper = Inf)$value
 }
 
-hist(sim.ws2, breaks = 30, probability = TRUE, main = "Marginal Density of WS2", xlab = "WS2", xlim = c(min(sim.ws2), max(sim.ws2)), col = "lightgray")
-
+#Range of values
 ws2_values = seq(min(sim.ws2), max(sim.ws2), length.out = 10)
 
 # Compute the marginal density of WS2 for this range
+start2 = proc.time()
 ws2_density = sapply(ws2_values, marginal_density_WS2)
+print(proc.time() - start2)
+
+#Plot density 
+hist(sim.ws2, breaks = 30, probability = TRUE, main = "Marginal Density of WS2", xlab = "WS2", xlim = c(min(sim.ws2), max(sim.ws2)), col = "lightgray")
 lines(ws2_values, ws2_density, col = "blue", lwd = 2)
+
+#------------------------------------
+#Marginal probability of WS2 > 10 
+#------------------------------------
+
+#-------------------------------
+## If I only use W1 and W2 ##
+#-------------------------------
+#Vectorize functions
+f_WS2_given_WS1_vect = Vectorize(f_WS2_given_WS1)
+f_WS1_vect = Vectorize(f_WS1)
+
+marginal_density_WS2 = Vectorize(function(ws2) {
+  integrate(function(ws1) {
+    f_WS2_given_WS1_vect(ws2, ws1) * f_WS1_vect(ws1)
+  }, lower = -100, upper = 100, rel.tol = 10^-3)$value
+})
+
+#Integrate marginal density WS2 to get the probability (integrating out WS1 from joint of WS1 and WS2)
+start = proc.time()
+pr.ws2.10.30 = integrate(marginal_density_WS2, lower = 10, upper = 30)$value ; print(pr.ws2.10.30)
+print(proc.time() - start) #3.85 min, .28
+
+mean(sim.ws2 >10 & sim.ws2<30) #close to simulation probability .304
+
+#-------------------------------
+## If I use joint of W1, W2 and W3 to get marginal probabilities of WS2 ##
+#-------------------------------
+
+#Vectorize 
+f_WS3_given_WS2_vect = Vectorize(f_WS3_given_WS2)
+
+WS2_joint_density_vect = Vectorize(function(ws2, ws1) {
+  integrate(function(ws3) {
+    f_WS3_given_WS2_vect(ws3, ws2)
+  }, lower = -60, upper = 60)$value * f_WS2_given_WS1_vect(ws2, ws1)
+})
+
+marginal_density_WS2_vect = Vectorize(function(ws2) {
+  integrate(function(ws1) {
+    WS2_joint_density_vect(ws2, ws1) * f_WS1_vect(ws1)
+  }, lower = -60, upper = 60)$value
+})
+
+#Integrate the marginal density WS2 (derived from integrating out WS1 and WS3)
+start = proc.time() 
+pr.ws2.fromWS3.10.15 = integrate(marginal_density_WS2_vect, lower = 10, upper = 15)$value ; print(pr.ws2.fromWS3.10.15)
+print(proc.time() - start) #3.6 minutes, .145
+
+mean(sim.ws2 >10 & sim.ws2<15) #similar to simulation probability #.155
+
 
 #--------------------------
 #WS3 - takes way too long
 #--------------------------
+#THIS IS INCORRECT becauses integrating out W1 does not simplify to f(W2)f(W3|W2) because W3 is technically conditioned on W1
 
-#Joint density f(W_S3, W_S2)
+
+#Joint density f(W_S3, W_S2) - THIS IS NOT TRUE 
 WS3_joint_density = function(ws3, ws2) {
   integrate(function(ws1) {
     f_WS2_given_WS1(ws2, ws1) * f_WS1(ws1)
@@ -301,7 +317,50 @@ hist(sim.ws3, breaks = 30, probability = TRUE, main = "Marginal Density of WS3",
 lines(ws3_values, ws3_density, col = "blue", lwd = 2)
 
 #-------------------------------------------------------------------------------
+# Define the marginal probability function for W_S3 > c
+
+#This is incorrect. Can't just integrate out ws1 to get the joint of ws2,ws3
+#because ws3 technically is conditioned on ws1 (Markov property just simplifies the conditional distribution)
+#-------------------------------------------------------------------------------
+P_WS3_greater_than_c = function(c) { #need to integrate out ws2 and ws1
+  integrate(function(ws2) {
+    integrate(function(ws1) {
+      f_WS1(ws1) * f_WS2_given_WS1(ws2, ws1)
+    }, lower = -Inf, upper = Inf)$value * (1 - pnorm(c, mean = ws2 + theta_S * (I3 - I2), sd = sqrt(I3 - I2)))
+  }, lower = -Inf, upper = Inf)$value
+}
+
+#P_WS3_greater_than_c(10) #this takes FOREVER...
+
+
+#-------------------------------------------------------------------------------
 #ROUGH WORK
+# 
+
+#Rough work when trying to find marginal probabilities of WS2
+# #Testing product of vector ws1 and fixed ws2 
+# f_WS1(c(10,15,20)) *f_WS2_given_WS1(15, c(10,15,20))
+# 
+# f_WS1_vect(c(10,15,20)) *f_WS2_given_WS1_vect(c(4,5,6), c(10,15,20))
+# 
+# #need to debug why I get the "evaluation of function gave result of wrong length" error. Nede to check all functions return a scalar. 
+# #Solution: had to Vectorize all the functions 
+# # All return scalars...
+# f_WS3_given_WS2(1,10) #returns scalar
+# f_WS2_given_WS1(10,15) #returns scalar
+# 
+# WS2_joint_density(20,23) #returns scalar
+# marginal_density_WS2(10) #returns scalar
+# 
+# #Testing f_WS1 and f_WS2_given_WS1 with vector inputs '
+# ws1_test <- c(1, 2, 3)
+# ws2_test <- 10
+# 
+# # Check the output of these functions
+# print(f_WS1(ws1_test))                
+# print(f_WS2_given_WS1(ws2_test, ws1_test))
+
+
 
 # 
 # #-------------------------------------------------------------------------------
@@ -311,17 +370,17 @@ lines(ws3_values, ws3_density, col = "blue", lwd = 2)
 # #-------------------------------------------------------------------------------
 # library(parallel)
 # 
-# start <- proc.time()
+# start = proc.time()
 # 
 # #GETTING VERY DIFFERENT ANSWER - .02 WHEN THE SERIES WAS .60
 # # Set up parallel backend
-# n_cores <- detectCores() - 1
-# cl <- makeCluster(n_cores)
+# n_cores = detectCores() - 1
+# cl = makeCluster(n_cores)
 # 
 # 
-# integrate_tight.tol_WS1_parallel <- function() {
-#   ws1_values <- seq(lb, ub, length.out = 100)  # Divide the interval into 100 points
-#   result <- parSapply(cl, ws1_values, function(ws1) {
+# integrate_tight.tol_WS1_parallel = function() {
+#   ws1_values = seq(lb, ub, length.out = 100)  # Divide the interval into 100 points
+#   result = parSapply(cl, ws1_values, function(ws1) {
 #     f_WS1(ws1) * integrate_WS2(ws1)
 #   })
 #   sum(result)
@@ -335,7 +394,7 @@ lines(ws3_values, ws3_density, col = "blue", lwd = 2)
 # #"parSapply", "integrate_tight.tol_WS1_parallel"
 # 
 # # Compute the probability using parallelized functions
-# probability <- integrate_tight.tol_WS1_parallel()
+# probability = integrate_tight.tol_WS1_parallel()
 # print(probability)
 # 
 # # Stop the parallel backend
@@ -345,15 +404,15 @@ lines(ws3_values, ws3_density, col = "blue", lwd = 2)
 # # 
 # # #Code with cl removed from parsapply() so cluster worker does not think "cl" is a defined object
 # # Parallelized integration of WS3
-# integrate_WS3_parallel <- function(ws2_values) {
-#   parSapply(ws2_values, function(ws2) {  # <- `cl` removed
+# integrate_WS3_parallel = function(ws2_values) {
+#   parSapply(ws2_values, function(ws2) {  # = `cl` removed
 #     integrate(f_WS3_given_WS2, lower = lb, upper = ub, ws2_values = ws2, rel.tol = 1e-10, subdivisions = 100)$value
 #   })
 # }
 # 
 # # Parallelized integration of WS2
-# integrate_WS2_parallel <- function(ws1_values) {
-#   parSapply(ws1_values, function(ws1) {  # <- `cl` removed
+# integrate_WS2_parallel = function(ws1_values) {
+#   parSapply(ws1_values, function(ws1) {  # = `cl` removed
 #     integrate(function(ws2) {
 #       f_WS2_given_WS1(ws2, ws1) * integrate_WS3_parallel(ws2)
 #     }, lower = lb, upper = ub, rel.tol = 1e-10, subdivisions = 100)$value
@@ -361,8 +420,8 @@ lines(ws3_values, ws3_density, col = "blue", lwd = 2)
 # }
 # 
 # # Parallelized integration of WS1
-# integrate_tight.tol_WS1_parallel <- function() {
-#   result <- parSapply(seq(lb, ub, length.out = 100), function(ws1) {  # <- `cl` removed
+# integrate_tight.tol_WS1_parallel = function() {
+#   result = parSapply(seq(lb, ub, length.out = 100), function(ws1) {  # = `cl` removed
 #     f_WS1(ws1) * integrate_WS2_parallel(ws1)
 #   })
 #   sum(result)
