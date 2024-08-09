@@ -2,9 +2,10 @@
 library(stats)
 library(mvtnorm)
 library(ggplot2)
+library(parallel)
 
 # Load your data
-load("C:/Users/lylae/OneDrive/Documents/Adaptive SMART paper/Group-Sequential-SMART-Research/3interim.anal.res.rda")
+load("~/Adaptive SMART paper/Group_Sequential_SMART_Design/3interim.anal.res.dmv.rda")
 
 # Define the necessary variances and covariances (all global variables so make sure to re-run if using other scripts with similar variable names)
 
@@ -116,7 +117,7 @@ f_WS3_given_WS2 = function(ws3, ws2) {
 }
 
 #-------------------------------------------------------------------------------
-#Recursive integration
+#Recursive integration functions
 #-------------------------------------------------------------------------------
 
 #--------------------------------------------------------------
@@ -125,7 +126,7 @@ f_WS3_given_WS2 = function(ws3, ws2) {
 integrate_WS3 = function(ws2_values) {
   integrate(function(ws3_values) {
     f_WS3_given_WS2(ws3_values, ws2_values)
-  }, lower = lb, upper = ub,rel.tol = 1e-10,subdivisions = 10000)$value
+  }, lower = lb, upper = ub,rel.tol = 1e-10,subdivisions = 100)$value
 }
 
 #integrate_WS3(10) #check that function runs
@@ -136,7 +137,7 @@ integrate_WS3 = function(ws2_values) {
 integrate_WS2 = function(ws1_values) {
   integrate(function(ws2_values) {
     f_WS2_given_WS1(ws2_values, ws1_values) * integrate_WS3(ws2_values)
-  }, lower = lb, upper = ub,rel.tol = 1e-10,subdivisions = 10000)$value
+  }, lower = lb, upper = ub,rel.tol = 1e-10,subdivisions = 100)$value
 }
 
 #integrate_WS2(10) #check
@@ -149,16 +150,18 @@ integrate_WS2 = function(ws1_values) {
 integrate_tight.tol_WS1 = function() {
   integrate(function(ws1_values) {
     f_WS1(ws1_values) * integrate_WS2(ws1_values)
-  }, lower = lb, upper = ub, rel.tol = 1e-10,subdivisions = 10000)$value
+  }, lower = lb, upper = ub, rel.tol = 1e-10,subdivisions = 100)$value
 }
 
-integrate_tight.tol_WS1() #.35 if lb=10, ub=1000, does not match simulation
 
+start = proc.time()
 # Compute the probability
-probability = integrate_tight.tol_WS1(); probability 
+probability = integrate_tight.tol_WS1(); probability #Getting .60
+print(proc.time() - start)
 
 #Verify with empirical probability with simulated ws1, ws2 and ws3 values
-mean(sim.ws1 > 10 & sim.ws2 > 10 & sim.ws3 > 10) #.035
+mean(sim.ws1 > 10 & sim.ws2 > 10 & sim.ws3 > 10) #.121
+
 
 #-------------------------------------------------------------------------------
 # Define the marginal probability function for W_S3 > c
@@ -266,7 +269,7 @@ marginal_density_WS2 = function(ws2) {
 
 hist(sim.ws2, breaks = 30, probability = TRUE, main = "Marginal Density of WS2", xlab = "WS2", xlim = c(min(sim.ws2), max(sim.ws2)), col = "lightgray")
 
-ws2_values = seq(min(sim.ws2), max(sim.ws2), length.out = 100)
+ws2_values = seq(min(sim.ws2), max(sim.ws2), length.out = 10)
 
 # Compute the marginal density of WS2 for this range
 ws2_density = sapply(ws2_values, marginal_density_WS2)
@@ -280,14 +283,14 @@ lines(ws2_values, ws2_density, col = "blue", lwd = 2)
 WS3_joint_density = function(ws3, ws2) {
   integrate(function(ws1) {
     f_WS2_given_WS1(ws2, ws1) * f_WS1(ws1)
-  }, lower = -Inf, upper = Inf, subdivisions = 10000)$value * f_WS3_given_WS2(ws3, ws2)
+  }, lower = -Inf, upper = Inf, subdivisions = 100)$value * f_WS3_given_WS2(ws3, ws2)
 }
 
 #Marginal density f(W_S3)
 marginal_density_WS3 = function(ws3) {
   integrate(function(ws2) {
     WS3_joint_density(ws3, ws2)
-  }, lower = -Inf, upper = Inf, subdivisions = 10000)$value
+  }, lower = -Inf, upper = Inf, subdivisions = 100)$value
 }
 
 #Density for a range of ws3 values in data 
@@ -297,3 +300,71 @@ ws3_density = sapply(ws3_values, marginal_density_WS3)
 hist(sim.ws3, breaks = 30, probability = TRUE, main = "Marginal Density of WS3", xlab = "WS3", xlim = c(min(sim.ws3), max(sim.ws3)), col = "lightgray")
 lines(ws3_values, ws3_density, col = "blue", lwd = 2)
 
+#-------------------------------------------------------------------------------
+#ROUGH WORK
+
+# 
+# #-------------------------------------------------------------------------------
+# #Recursive integration (IN PARALLEL)
+# 
+# # Using Parallel versions of recursive integration functions
+# #-------------------------------------------------------------------------------
+# library(parallel)
+# 
+# start <- proc.time()
+# 
+# #GETTING VERY DIFFERENT ANSWER - .02 WHEN THE SERIES WAS .60
+# # Set up parallel backend
+# n_cores <- detectCores() - 1
+# cl <- makeCluster(n_cores)
+# 
+# 
+# integrate_tight.tol_WS1_parallel <- function() {
+#   ws1_values <- seq(lb, ub, length.out = 100)  # Divide the interval into 100 points
+#   result <- parSapply(cl, ws1_values, function(ws1) {
+#     f_WS1(ws1) * integrate_WS2(ws1)
+#   })
+#   sum(result)
+# }
+# 
+# # Export necessary functions and variables to cluster workers
+# clusterExport(cl, c("f_WS1", "f_WS2_given_WS1", "f_WS3_given_WS2", "integrate_WS3", "integrate_WS2",
+#                     "WS1_S_joint_density", "WS_XS_S_joint_density", "XS_S_joint_density",
+#                     "lb", "ub", "I1", "I2", "I3", "VAI_1", "VC_1", "a", "b", "pmvnorm"))
+# 
+# #"parSapply", "integrate_tight.tol_WS1_parallel"
+# 
+# # Compute the probability using parallelized functions
+# probability <- integrate_tight.tol_WS1_parallel()
+# print(probability)
+# 
+# # Stop the parallel backend
+# stopCluster(cl)
+# print(proc.time() - start)
+
+# # 
+# # #Code with cl removed from parsapply() so cluster worker does not think "cl" is a defined object
+# # Parallelized integration of WS3
+# integrate_WS3_parallel <- function(ws2_values) {
+#   parSapply(ws2_values, function(ws2) {  # <- `cl` removed
+#     integrate(f_WS3_given_WS2, lower = lb, upper = ub, ws2_values = ws2, rel.tol = 1e-10, subdivisions = 100)$value
+#   })
+# }
+# 
+# # Parallelized integration of WS2
+# integrate_WS2_parallel <- function(ws1_values) {
+#   parSapply(ws1_values, function(ws1) {  # <- `cl` removed
+#     integrate(function(ws2) {
+#       f_WS2_given_WS1(ws2, ws1) * integrate_WS3_parallel(ws2)
+#     }, lower = lb, upper = ub, rel.tol = 1e-10, subdivisions = 100)$value
+#   })
+# }
+# 
+# # Parallelized integration of WS1
+# integrate_tight.tol_WS1_parallel <- function() {
+#   result <- parSapply(seq(lb, ub, length.out = 100), function(ws1) {  # <- `cl` removed
+#     f_WS1(ws1) * integrate_WS2_parallel(ws1)
+#   })
+#   sum(result)
+# }
+# 

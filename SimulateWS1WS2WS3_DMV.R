@@ -363,9 +363,9 @@ hist(int2.res$zs)
 summary(int2.res$zs)
 t.test(int2.res$zs)
 
-#setwd("~/Adaptive SMART paper/Group-Sequential-SMART-Research")
+setwd("~/Adaptive SMART paper/Group_Sequential_SMART_Design")
 save(int1.res,int2.res,int3.res,
-	file="G:\\My Drive\\research\\TO_BE_FILED\\3interim.anal.res.dmv.rda")
+	file="3interim.anal.res.dmv.rda")
 
 
 #-------------------------------------------------------------------------------
