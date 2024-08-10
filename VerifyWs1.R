@@ -157,7 +157,7 @@ compute_upper_prob <- function(u1, a, b, VAI, VC, I) {
   #return(upper_prob)
   return(upper_prob - (1 - alpha_star_upper))
 }
-compute_upper_prob(u1=45,a=a,b=b,VAI=VAI_1,VC=VC_1,I=I_1)
+#compute_upper_prob(u1=45,a=a,b=b,VAI=VAI_1,VC=VC_1,I=I_1)
 
 compute_lower_prob <- function(l1, a, b, VAI, VC, I) {
   lower_prob <- sum(sapply(treatments, function(treat) {
