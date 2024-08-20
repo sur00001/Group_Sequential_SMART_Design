@@ -6,7 +6,7 @@ library(mvtnorm)
 library(ggplot2)
 
 #Read in functions
-source("~/Adaptive SMART paper/Group_Sequential_SMART_Design/VerifyWs1Ws2Ws3Prob_DMV.R")
+source("~/Adaptive SMART paper/Group_Sequential_SMART_Design/Functions4JointProbsMargDensitiesofWS.R")
 
 # Load your data
 load("~/Adaptive SMART paper/Group_Sequential_SMART_Design/3interim.anal.res.dmv.rda")
@@ -37,19 +37,27 @@ theta_S = 0
 # Grid search to find boundaries for 3 interim analyses 
 #-------------------------------------------------------------------------------
 
-# Function to compute joint probability for given boundaries
-compute_joint_prob = function(u1, l1, u2, l2, u3, l3) {
-  
-  joint_prob = integrate(Vectorize(function(ws1) {
-    f_WS1(ws1) * integrate(Vectorize(function(ws2) {
-      f_WS2_given_WS1(ws2, ws1) * integrate(f_WS3_given_WS2, lower = l3, upper = u3, ws2 = ws2, rel.tol = 1e-10)$value
-    }), lower = l2, upper = u2, rel.tol = 1e-10)$value
-  }), lower = l1, upper = u1, rel.tol = 1e-10)$value
-  
+# Function to compute joint probability for given boundaries for all interim analyses 
+compute_joint_prob = function(u1, l1, u2, l2, u3=Inf, l3=-Inf, num.IntAnal) {
+
+  if (num.IntAnal == 2) {
+    
+    joint_prob =integrate(Vectorize(function(ws1) {
+      f_WS1(ws1) * integrate(f_WS2_given_WS1, lower = l2, upper = u2, ws1 = ws1,rel.tol = 1e-10)$value
+    }), lower = l1, upper = u1,rel.tol = 1e-10)$value
+    
+  } else {
+    
+    joint_prob = integrate(Vectorize(function(ws1) {
+      f_WS1(ws1) * integrate(Vectorize(function(ws2) {
+        f_WS2_given_WS1(ws2, ws1) * integrate(f_WS3_given_WS2, lower = l3, upper = u3, ws2 = ws2, rel.tol = 1e-10)$value
+      }), lower = l2, upper = u2, rel.tol = 1e-10)$value
+    }), lower = l1, upper = u1, rel.tol = 1e-10)$value
+  }
   return(joint_prob)
 }
 
-# How much alpha to spend for each interim analysis interim analysis
+# How much alpha to spend for each interim analysis 
 alpha_star_upper_1 = 0.05 / 3
 alpha_star_upper_2 = 0.05 / 3
 alpha_star_upper_3 = 0.05 / 3
@@ -67,26 +75,36 @@ find_boundary_u1 = function(u1) { #Using global variables
 }
 
 # Define the range for uniroot to search for the u1 boundaries
-u1_search_range <- c(20,30)
+u1_search_range <- c(15,20)
 
 # Grid search for u1
-fixed_u1 <- uniroot(find_boundary_u1, interval = u1_search_range)$root
+start = proc.time()
+fixed_u1 <- uniroot(find_boundary_u1, interval = u1_search_range)$root #4 min
+print(proc.time() - start)
+
+#See if Pr(WS1 > fixed_u1) is .05/3 from simulation
+mean(sim.ws1>fixed_u1)
+#Probability is .01 (should be .01666) #Should try with 5000-10000 simulation reps instead of 1000
 
 #---------------------------------------------------------------
 # Interim analysis 2
 #---------------------------------------------------------------
 
-# Function to find u2 given u1 
+# Function to find u2 given u1 - #just use the joint distribution of Ws1, Ws2
 find_boundary_u2 = function(u2) {
-  upper_prob = compute_joint_prob(u1 = fixed_u1, l1 = -Inf, u2 = u2, l2 = -Inf, u3 = Inf, l3 = -Inf)
+  upper_prob = compute_joint_prob(u2 = u2, l2 = -Inf, u1 = fixed_u1, l1 = -Inf, num.IntAnal = 2)
   return(upper_prob - (1 - alpha_star_upper_2))
 }
+#Need to double check this this weekend and investigate different ranges to search
 
-# Define the range for uniroot to search for the u2 boundaries
-u2_search_range <- c(30,40)
+# Define the range for uniroot to search for the u2 boundaries, only getting negative values
+u2_search_range <- c(35,55)
 
 # Grid search for u2, given fixed_u1
+start = proc.time()
 fixed_u2 = uniroot(find_boundary_u2, interval = u2_search_range)$root
+print(proc.time() - start)
+
 
 #---------------------------------------------------------------
 # Interim analysis 3
